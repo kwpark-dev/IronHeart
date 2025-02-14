@@ -24,7 +24,7 @@ class Critic(nn.Module):
                 
     
     def forward(self, x, y):
-        xy = torch.cat([x, y], dim=1)
+        xy = torch.cat([x, y], dim=-1)
         feature = self.backbone(xy)
         value = self.head(feature)
         

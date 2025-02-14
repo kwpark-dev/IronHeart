@@ -25,7 +25,7 @@ from player.ddpg import AgentDDPG, ReplayBuffer
 # env.close()
 
 
-EPISODE = 128
+EPISODE = 2048
 
 if __name__ == "__main__":
     env = gym.make("Hopper-v5")
@@ -37,16 +37,19 @@ if __name__ == "__main__":
     min_action = env.action_space.low
     
     print(max_action, in_dim, out_dim, env.action_space.low)
-    
+    # save actor lr: 1e-6, critic lr: 6e-4
     config = {'in_dim':in_dim,
               'out_dim': out_dim,
-              'actor_lr':1e-4,
-              'critic_lr':8e-4,
-              'tau':4e-4,
+              'actor_lr':4e-6,
+              'critic_lr':4e-5,
+              'tau':1e-3,
               'noise':0.1,
+              'max': max_action[0],
+              'min': min_action[0],
+              'start': 256,
               'gamma':0.99,
-              'batch':64,
-              'capacity':10000}
+              'batch':128,
+              'capacity':4096}
     
     agent = AgentDDPG(Actor, Critic, Adam, ReplayBuffer, config)
     reward_list = []
@@ -94,8 +97,10 @@ if __name__ == "__main__":
         
     actor_list = agent.actor_list
     critic_list = agent.critic_list
+    actor_grad = agent.actor_grad
+    critic_grad = agent.critic_grad
         
-    fig, ax = plt.subplots(1, 3, figsize=(13, 4))
+    fig, ax = plt.subplots(1, 5, figsize=(21, 4))
     
     ax[0].plot(reward_list, color='black')
     ax[0].set_title('Cumulative Reward')
@@ -103,7 +108,13 @@ if __name__ == "__main__":
     ax[1].plot(actor_list, color='blue')
     ax[1].set_title('Actor Loss')
     
-    ax[2].plot(critic_list, color='red')
-    ax[2].set_title('Critic Loss')
+    ax[2].plot(actor_grad, color='blue')
+    ax[2].set_title('Gradient Norm')
+    
+    ax[3].plot(critic_list, color='red')
+    ax[3].set_title('Critic Loss')
+    
+    ax[4].plot(critic_grad, color='red')
+    ax[4].set_title('Gradient Norm')
     
     plt.show()

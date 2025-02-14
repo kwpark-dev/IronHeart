@@ -23,7 +23,10 @@ class AgentDDPG:
         self.critic_opt = optimizer(self.critic.parameters(), lr=self.critic_lr)
     
         self.actor_list = []
+        self.actor_grad = []
         self.critic_list = []
+        self.critic_grad = []
+        
         
     def _sync(self, net, target_net):
         weights = target_net.state_dict()
@@ -38,32 +41,41 @@ class AgentDDPG:
         self.critic_lr = config['critic_lr']
         self.tau = config['tau']
         self.noise = config['noise']
+        self.max = config['max']
+        self.min = config['min']
+        self.start = config['start']
         self.gamma = config['gamma']
         self.batch = config['batch']
         self.capacity = config['capacity']
         
     
     def learn(self): # training mode
-        if len(self.storage) < 2 * self.batch: return
+        if len(self.storage) < self.start: return
         
         state, action, reward, done, next_state = self.storage.fetch(self.batch)
         
         with torch.no_grad():
             next_action = self.actor_target(next_state)
             q_target = self.critic_target(next_state, next_action)
-            q_target = reward + self.gamma * (1 - done) * q_target
+            backup = reward + self.gamma * (1 - done) * q_target
         
         q_est = self.critic(state, action)
-        critic_loss = ((q_target - q_est)**2).mean()
+        critic_loss = ((backup - q_est)**2).mean()
         
         self.critic_opt.zero_grad()
         critic_loss.backward()
+        # trace grad norm
+        critic_grad = self._trace_grad(self.critic)
+        self.critic_grad.append(critic_grad)
         self.critic_opt.step()
 
         actor_loss = - self.critic(state, self.actor(state)).mean()
         
         self.actor_opt.zero_grad()
         actor_loss.backward()
+        # trace grad norm
+        actor_grad = self._trace_grad(self.actor)
+        self.actor_grad.append(actor_grad)
         self.actor_opt.step()
 
         print(actor_loss.item(), critic_loss.item())
@@ -71,14 +83,25 @@ class AgentDDPG:
         self.actor_list.append(actor_loss.item())
         self.critic_list.append(critic_loss.item())
 
-        for param, target_param in zip(self.actor.parameters(), self.actor_target.parameters()):
-            target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
+        with torch.no_grad(): # if not, the targets are added to grad. graph
+            for param, target_param in zip(self.actor.parameters(), self.actor_target.parameters()):
+                target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
 
-        for param, target_param in zip(self.critic.parameters(), self.critic_target.parameters()):
-            target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
+            for param, target_param in zip(self.critic.parameters(), self.critic_target.parameters()):
+                target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
 
-        # return actor_loss.item(), critic_loss.item()
-
+        
+    def _trace_grad(self, model):
+        grad_norm = 0.0
+        
+        for param in model.parameters():
+            if param.grad is not None:
+                grad_norm += param.grad.norm(2).item() ** 2
+        
+        return grad_norm ** 0.5
+        
+        
+        
             
     def action(self, state, mode='train'):
         if mode == 'train':
@@ -87,7 +110,9 @@ class AgentDDPG:
             with torch.no_grad():
                 action = self.actor(state)
             
-            return action + self.noise * torch.randn(self.out_dim)
+            noise = self.noise * torch.randn(self.out_dim)
+            
+            return torch.clamp(action + noise, self.min, self.max)
     
         else:
             self.actor_target.eval()
