@@ -7,20 +7,14 @@ class Critic(nn.Module):
     def __init__(self, state_dim, action_dim):
         super(Critic, self).__init__()
         
-        self.backbone = nn.Sequential(nn.Linear(state_dim + action_dim, 128),
+        self.backbone = nn.Sequential(nn.Linear(state_dim + action_dim, 256),
                                       nn.ReLU(),
-                                      nn.Linear(128, 128),
+                                      nn.Linear(256, 256),
                                       nn.ReLU(),
-                                      nn.Linear(128, 128),
-                                      nn.ReLU(),
-                                      nn.Linear(128, 128),
-                                      nn.ReLU(),
-                                      nn.Linear(128, 128),
-                                      nn.ReLU(),
-                                      nn.Linear(128, 128),
+                                      nn.Linear(256, 256),
                                       nn.ReLU())
         
-        self.head = nn.Linear(128, 1)
+        self.head = nn.Linear(256, 1)
                 
     
     def forward(self, x, y):
