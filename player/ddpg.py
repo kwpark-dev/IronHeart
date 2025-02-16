@@ -50,7 +50,7 @@ class AgentDDPG:
         
     
     def learn(self): # training mode
-        print(len(self.storage))
+        # print(len(self.storage))
         if len(self.storage) < self.start: return
         
         state, action, reward, done, next_state = self.storage.fetch(self.batch)

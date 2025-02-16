@@ -7,6 +7,7 @@ import numpy as np
 from network.actor import Actor
 from network.critic import Critic
 from player.ddpg import AgentDDPG, ReplayBuffer
+from utils.estimator import monte_carlo_return
 
 
 EPISODE = 4096
@@ -44,6 +45,7 @@ if __name__ == "__main__":
     critic_list = []
     q_est_list = []
     q_target_list = []
+    bias_list = []
     for _ in range(EPISODE):
         state, _ = env.reset()
         state = torch.tensor(state, dtype=torch.float32)
@@ -68,6 +70,8 @@ if __name__ == "__main__":
         R = 0
         data_est = []
         data_target = []
+        reward_col = []
+        done_col = []
         
         state, _ = env.reset()
         state = torch.tensor(state, dtype=torch.float32)
@@ -82,6 +86,8 @@ if __name__ == "__main__":
             R += reward
             data_est.append(q_est)
             data_target.append(q_target)
+            reward_col.append(reward)
+            done_col.append(done)
             
             if done or trun:
                 print("Cumulative reward: {}".format(R))
@@ -91,6 +97,7 @@ if __name__ == "__main__":
         reward_list.append(R)
         data_est = np.array(data_est)
         data_target = np.array(data_target)
+        mc_return = monte_carlo_return(reward_col, done_col, gamma=config['gamma'])
         
         q_est_list.append(np.array([data_est.mean(),
                                     data_est.var(),
@@ -99,6 +106,9 @@ if __name__ == "__main__":
         q_target_list.append(np.array([data_target.mean(),
                                        data_target.var(),
                                        data_target.min()]))
+        
+        bias_list.append(np.array([abs(data_est.mean() - mc_return.mean()),
+                                   abs(data_target.mean() - mc_return.mean())]))
                 
     actor_list = agent.actor_list
     critic_list = agent.critic_list
@@ -107,11 +117,14 @@ if __name__ == "__main__":
         
     q_est_list = np.array(q_est_list)
     q_target_list = np.array(q_target_list)    
+    bias_list = np.array(bias_list)
         
     a_est, v_est, m_est = q_est_list.T
     a_target, v_target, m_target = q_target_list.T    
+    
+    bias_est, bias_target = bias_list.T
         
-    fig, ax = plt.subplots(2, 4, figsize=(17, 9))
+    fig, ax = plt.subplots(3, 3, figsize=(13, 13))
     
     ax[0][0].plot(reward_list, color='black')
     ax[0][0].set_title('Cumulative Reward')
@@ -122,7 +135,7 @@ if __name__ == "__main__":
     
     ax[0][1].plot(v_est, color='orange', ls='--', label='estimated')
     ax[0][1].plot(v_target, color='cyan', ls='--', label='target')
-    ax[0][1].set_title('Var Q value')
+    ax[0][1].set_title('Variance Q value')
     ax[0][1].legend()
     ax[1][1].plot(m_est, color='orange', ls=':', label='estimated')
     ax[1][1].plot(m_target, color='cyan', ls=':', label='target')
@@ -134,10 +147,15 @@ if __name__ == "__main__":
     ax[1][2].plot(actor_grad, color='blue')
     ax[1][2].set_title('Gradient Norm')
     
-    ax[0][3].plot(critic_list, color='red')
-    ax[0][3].set_title('Critic Loss')
-    ax[1][3].plot(critic_grad, color='red')
-    ax[1][3].set_title('Gradient Norm')
+    ax[2][0].plot(critic_list, color='red')
+    ax[2][0].set_title('Critic Loss')
+    ax[2][1].plot(critic_grad, color='red')
+    ax[2][1].set_title('Gradient Norm')
+    
+    ax[2][2].plot(bias_est, color='orange', ls='-.', label='estimated')
+    ax[2][2].plot(bias_target, color='cyan', ls='-.', label='target')
+    ax[2][2].set_title('Bias Q value')
+    ax[2][2].legend()
     
     fig.suptitle(name)
     plt.savefig('./images/ddpg/{}_gam_0{}.jpg'.format(name, 
