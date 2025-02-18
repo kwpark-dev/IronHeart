@@ -20,7 +20,7 @@ class AgentDDPG:
         self.critic_target = critic_net(self.in_dim, self.out_dim)
         self._sync(self.critic, self.critic_target)
         
-        self.critic_opt = optimizer(self.critic.parameters(), lr=self.critic_lr)
+        self.critic_opt = optimizer(self.critic.parameters(), lr=self.critic_lr, weight_decay=self.l2)
     
         self.actor_list = []
         self.actor_grad = []
@@ -47,6 +47,7 @@ class AgentDDPG:
         self.gamma = config['gamma']
         self.batch = config['batch']
         self.capacity = config['capacity']
+        self.l2 = config['L2']
         
     
     def learn(self): # training mode
@@ -80,7 +81,7 @@ class AgentDDPG:
         self.actor_grad.append(actor_grad)
         self.actor_opt.step()
 
-        print(actor_loss.item(), critic_loss.item())
+        # print(actor_loss.item(), critic_loss.item())
 
         self.actor_list.append(actor_loss.item())
         self.critic_list.append(critic_loss.item())

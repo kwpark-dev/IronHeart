@@ -7,20 +7,17 @@ class Critic(nn.Module):
     def __init__(self, state_dim, action_dim):
         super(Critic, self).__init__()
         
-        self.backbone = nn.Sequential(nn.Linear(state_dim + action_dim, 256),
-                                      nn.ReLU(),
-                                      nn.Linear(256, 256),
-                                      nn.ReLU(),
-                                      nn.Linear(256, 256),
-                                      nn.ReLU())
-        
-        self.head = nn.Linear(256, 1)
-                
+        self.net = nn.Sequential(nn.Linear(state_dim + action_dim, 512),
+                                 nn.ReLU(),
+                                 nn.Linear(512, 256),
+                                 nn.ReLU(),
+                                 nn.Linear(256, 256),
+                                 nn.ReLU(),
+                                 nn.Linear(256, 1))
     
     def forward(self, x, y):
         xy = torch.cat([x, y], dim=-1)
-        feature = self.backbone(xy)
-        value = self.head(feature)
+        value = self.net(xy)
         
         return value
     
@@ -30,17 +27,17 @@ class TwinCritic(nn.Module):
     def __init__(self, state_dim, action_dim):
         super(TwinCritic, self).__init__()
         
-        self.q_one = nn.Sequential(nn.Linear(state_dim + action_dim, 256),
+        self.q_one = nn.Sequential(nn.Linear(state_dim + action_dim, 512),
                                    nn.ReLU(),
-                                   nn.Linear(256, 256),
+                                   nn.Linear(512, 256),
                                    nn.ReLU(),
                                    nn.Linear(256, 256),
                                    nn.ReLU(),
                                    nn.Linear(256, 1))
         
-        self.q_two = nn.Sequential(nn.Linear(state_dim + action_dim, 256),
+        self.q_two = nn.Sequential(nn.Linear(state_dim + action_dim, 512),
                                    nn.ReLU(),
-                                   nn.Linear(256, 256),
+                                   nn.Linear(512, 256),
                                    nn.ReLU(),
                                    nn.Linear(256, 256),
                                    nn.ReLU(),

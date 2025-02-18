@@ -7,7 +7,9 @@ class Actor(nn.Module):
         super(Actor, self).__init__()
         
         self.scale = scale
-        self.backbone = nn.Sequential(nn.Linear(state_dim, 256),
+        self.backbone = nn.Sequential(nn.Linear(state_dim, 512),
+                                      nn.ReLU(),
+                                      nn.Linear(512, 256),
                                       nn.ReLU(),
                                       nn.Linear(256, 256),
                                       nn.ReLU())

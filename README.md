@@ -1,45 +1,161 @@
 # IronHeart
 
-In this project, several representatives of modern RL approaches, especially deep learning-based, will be addressed. The learning capability is examined in Mujoco environments which contain continuous action and state space: InvertedPendulum-v5, Reacher-v5, and HalfCheetah-v5. The objectives are as follows.
+In this project, several representatives of modern RL approaches, especially deep learning-based, will be addressed. The learning capability is examined in "simple" Mujoco environments: InvertedPendulum-v5, Reacher-v5, and Hopper-v5. The objectives are as follows.
 
 1. Brief taxonomy & chronicle
 2. The strategies and the implications
 3. Implementation from scratch
+4. Experiements
+
+Please note that x axis indicates epochs therefore the batch size should be multiplied to represent them as steps. The robust evaluation should be done statistically rather than one-shot measurement. The experiments were not repeated multiple times. Thus, please do not jump to the conclusion based on these result.  
 
 ## Deep Deterministic Policy Gradient (DDPG)
 
+### Taxonomy
+
 | Type        | Training Policy | Execution Policy | Sampling | Remark |
 |-------------|-----------------|-------------|---------------|-------|
-| Off-policy  | Deterministic  | Deterministic | Implicit | Target Network|
+| Off-policy  | Deterministic + Noise  | Deterministic |   .    | Target Network|
 
-The essence of DDPG is target networks which allows stable updates of the weights. First, it bootstraps Q-values via temporal difference (TD) correction to train the current cirtic network. Due to off-policy nature, the stacked data in the replay buffer would have high variance, it leads to unstable learning. The target networks take account of small portion of the current networks as updates so that it achieves balanced improvements. In other words, the target networks correct TD-corrected values of different policies: it can reduce the intrinsic variance! Followings are results of the experiments. Note that employed hyper-parameters including model architectures of each experiment are identical (you can find better hyper-parameters).
+
+### History
+
+Deterministic Policy Gradient (DPG) --> DDPG
+
+
+### Key Elements
+
+1. Artificial noise to actions for exploration steps
+2. Temporal difference (TD) correction through bootstrapping
+3. Target networks
+4. Polyak updates of the targets
+5. L2 regularization (in Adam optimizer)
+
+The essence of DDPG is target networks which allows stable updates of the weights. It bootstraps Q-values via TD correction to train the current cirtic network. Due to off-policy nature, the stacked data in the replay buffer would cotain high variance, which leads to instability. The target networks take account of small portion of the current networks as updates so that it achieves stable improvements. In other words, the target networks correct TD-corrected values: it can mitigate the intrinsic variance coming from old policies.
+
+
+### Experiments
+Followings are results of the experiments. Note that employed hyper-parameters including model architectures of each experiment are identical (you can find better hyper-parameters). Q values from the targets (cyan) are more stabilized than the one from the current networks. Bias is measured using Monte-Carlo (MC) return and is normalized. The value is clipped between -1 and 1. The agent in Reacher-v5 shows better behaviors. As the cumulative reward converges, mean, variance and minimum of Q values are also converging. Critic loss seems to contain instability but it is bit mild than the others. 
 
 <img src="images/ddpg/InvertedPendulum-v5_gam_099.jpg" alt="Performance Test" width="700"/>
 
 <img src="images/ddpg/Reacher-v5_gam_099.jpg" alt="Performance Test" width="700"/>
 
-<img src="images/ddpg/HalfCheetah-v5_gam_099.jpg" alt="Performance Test" width="700"/>
+<img src="images/ddpg/Hopper-v5_gam_099.jpg" alt="Performance Test" width="700"/>
 
-You may notice that the DDPG agent in the simplest environment (Inverted Pendulum) shows learning instability. Both Q-values inferred from the critic and the target critic are getting higher variance over time while the means are increasing. Besides, differences between the estimated values and Monte-Carlo returns keep certain level rather than decreasing, which means biased. It would imply overestimation of Q values regarding particular states & actions. But, why does "InvertedPendulum-v5" deliver (too) poor performance among the environments? Maybe, it is too small environment affected by misleading Q values easily. 
+On the other hand, the rest of the environments deliver unstable behaviors. First of all, critic loss of each env collapses in the middle of the training. Though mean and min keep growing, due to instability, values are significantly underestimated (or overestimated) according to the bias plot. 
+
+### Observations
+1. Overestimation (but it is unclear to check)
+2. Learning instability
+3. Suboptimal
+
 
 
 ## Twin Delayed Deep Deterministic Policy Gradient (TD3)
 
+### Taxonomy
+
 | Type        | Training Policy | Execution Policy | Sampling | Remark |
 |-------------|-----------------|-------------|---------------|-------|
-| Off-policy  | Deterministic  | Deterministic | Implicit | Twin Critics, Delayed Updates|
+| Off-policy  | Deterministic + Noise | Deterministic | . | Twin Critics, Delayed Updates|
+
+
+### History
+
+DPG --> DDPG --> TD3
+
+
+### Key Elements
+
+1. Artificial noise to actions for exploration steps
+2. TD correction through bootstrapping
+3. Twin critics (of course twin target critics as well)
+4. Polyak updates of the targets
+5. Policy smoothing
+6. Delayed updates of the targets and an actor
+
+TD3 is an improved version of DDPG, it mainly deals with overestimation bias problem. Though the proof in TD3 assumes theoretical cricumstance, it clearly shows that even actor-critic in deteministic approach can gurantee overestimation. TD3 compares Q values from two different critics and choose a smaller one to mitigate the exaggeration. It definitely stabilize learning procedure but I still have a question mark if it "significantly" improve the optimization capability.
+
+### Experiments
+I agree that it can stabilize the learning process (if we set $\tau$ same as DDPG) because the instability of the critic networks is dramatically reduced. It still, however, struggles to find the optimum behaviors. 
 
 <img src="images/td3/InvertedPendulum-v5_gam_099.jpg" alt="Performance Test" width="700"/>
 
 <img src="images/td3/Reacher-v5_gam_099.jpg" alt="Performance Test" width="700"/>
 
-<img src="images/td3/HalfCheetah-v5_gam_099.jpg" alt="Performance Test" width="700"/>
+<img src="images/td3/Hopper-v5_gam_099.jpg" alt="Performance Test" width="700"/>
+
+
+
+## Soft Actor-Critic (SAC)
+
+DPG --> DDPG --> TD3 --> SAC
+
+
+### Taxonomy
+
+
+### History
+
+
+### Key Elements
+
+
+
+### Experiments
+
 
 
 ## Proximal Policy Optimization (PPO)
 
+### Taxonomy
 
-## (A3C)
+
+### History
+
+Conservative Policy Ieteration (CPI) --> Trusted Region Policy Optimization (TRPO) --> PPO
 
 
-## (IMPALA)
+### Key Elements
+
+
+
+### Experiments
+
+
+
+## Asynchronous Advantage Actor-Critic (A3C)
+
+
+### Taxonomy
+
+
+### History
+
+Advantage Actor-Critic (A2C) --> A3C
+
+
+### Key Elements
+
+
+
+### Experiments
+
+
+## Importance-Weighted Actor-Learner Architecture (IMPALA)
+
+
+### Taxonomy
+
+
+### History
+
+A2C --> A3C --> GPU A3C (GA3C) --> IMPALA
+
+
+### Key Elements
+
+
+
+### Experiments
