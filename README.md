@@ -4,10 +4,11 @@ In this project, several representatives of modern RL approaches, especially dee
 
 1. Brief taxonomy & chronicle
 2. The strategies and the implications
-3. Implementation from scratch
+3. "NAIVE" implementation based on the paper from scratch
 4. Experiements
+5. How to improve
 
-Please note that x axis indicates epochs therefore the batch size should be multiplied to represent them as steps. The robust evaluation should be done statistically rather than one-shot measurement. The experiments were not repeated multiple times. Thus, please do not jump to the conclusion based on these result.  
+Here, **"NAIVE" implementation** means following the learning strategy presented in the paper **without trick**. Sometimes authors don't reveal their full approach, which can lead to "exaggerated" performance unintentionally. I believe, it also helps to understand fundamental problems beneath modern RL algorithms. Please note that x axis indicates epochs therefore the batch size should be multiplied to represent them as steps. The robust evaluation should be done statistically rather than one-shot measurement. The experiments were not repeated multiple times. Thus, please do not jump to the conclusion based on these results.  
 
 ## Deep Deterministic Policy Gradient (DDPG)
 
@@ -20,7 +21,7 @@ Please note that x axis indicates epochs therefore the batch size should be mult
 
 ### History
 
-Deterministic Policy Gradient (DPG) --> DDPG
+Deterministic Policy Gradient (DPG) → DDPG
 
 
 ### Key Elements
@@ -35,7 +36,7 @@ The essence of DDPG is target networks which allows stable updates of the weight
 
 
 ### Experiments
-Followings are results of the experiments. Note that employed hyper-parameters including model architectures of each experiment are identical (you can find better hyper-parameters). Q values from the targets (cyan) are more stabilized than the one from the current networks. Bias is measured using Monte-Carlo (MC) return and is normalized. The value is clipped between -1 and 1. The agent in Reacher-v5 shows better behaviors. As the cumulative reward converges, mean, variance and minimum of Q values are also converging. Critic loss seems to contain instability but it is bit mild than the others. 
+Followings are results of the experiments. Note that employed hyper-parameters including model architectures of each experiment are identical (you can find better hyper-parameters). Q values from the targets (cyan) are more stabilized than the one from the current networks. Bias is measured using Monte-Carlo (MC) return and is normalized. The value is clipped between -1 and 1. The agent in Reacher-v5 shows better behaviors. As the cumulative reward converges, mean, variance and minimum of Q values are also converging. Critic loss, however, seems to contain risk of instability because the gradient norm is rather high. Besides, bias is totally in chaos...
 
 <img src="images/ddpg/InvertedPendulum-v5_gam_099.jpg" alt="Performance Test" width="700"/>
 
@@ -43,13 +44,21 @@ Followings are results of the experiments. Note that employed hyper-parameters i
 
 <img src="images/ddpg/Hopper-v5_gam_099.jpg" alt="Performance Test" width="700"/>
 
-On the other hand, the rest of the environments deliver unstable behaviors. First of all, critic loss of each env collapses in the middle of the training. Though mean and min keep growing, due to instability, values are significantly underestimated (or overestimated) according to the bias plot. 
+On the other hand, the rest of the environments deliver (tooooo) unstable behaviors. Critic loss of each env collapses in the middle of the training:it cannot estimate the values properly. This fact implies, the critic deceives the actor that belives make a best decision-making.
 
-### Observations
-1. Overestimation (but it is unclear to check)
-2. Learning instability
-3. Suboptimal
+### Discussion
+DDPG needs well-tuned hyper-paarameters as well as a couple of training tricks such that 
 
+1. Gradient clipping
+2. Prioritized replay buffer & fill the buffer before starting training
+3. Layer normalization (like batchnorm, layernorm, etc)
+
+to stabilize the learning procedure. Along with learning instability, overestimation is another main defect of DDPG. Then, what are the lessons from DDPG approach? In my opinion, we should look at 
+
+1. Data distribution in the replay buffer
+2. Statistical meaning of "parsing trajectories"
+
+In case 2, critic samples data points with batch size and each of them belongs to different (or same) sequences that is generated from old policies. Target critic might not be safe enough to guard against the variance coming from policy discrepancy. Well, it needs more analytic investigation. 
 
 
 ## Twin Delayed Deep Deterministic Policy Gradient (TD3)
@@ -63,7 +72,7 @@ On the other hand, the rest of the environments deliver unstable behaviors. Firs
 
 ### History
 
-DPG --> DDPG --> TD3
+DPG → DDPG → TD3
 
 
 ### Key Elements
@@ -90,7 +99,7 @@ I agree that it can stabilize the learning process (if we set $\tau$ same as DDP
 
 ## Soft Actor-Critic (SAC)
 
-DPG --> DDPG --> TD3 --> SAC
+DPG → DDPG → TD3 → SAC
 
 
 ### Taxonomy
@@ -114,7 +123,7 @@ DPG --> DDPG --> TD3 --> SAC
 
 ### History
 
-Conservative Policy Ieteration (CPI) --> Trusted Region Policy Optimization (TRPO) --> PPO
+Conservative Policy Ieteration (CPI) → Trusted Region Policy Optimization (TRPO) → PPO
 
 
 ### Key Elements
@@ -133,7 +142,7 @@ Conservative Policy Ieteration (CPI) --> Trusted Region Policy Optimization (TRP
 
 ### History
 
-Advantage Actor-Critic (A2C) --> A3C
+Advantage Actor-Critic (A2C) → A3C
 
 
 ### Key Elements
@@ -151,7 +160,7 @@ Advantage Actor-Critic (A2C) --> A3C
 
 ### History
 
-A2C --> A3C --> GPU A3C (GA3C) --> IMPALA
+A2C → A3C → GPU A3C (GA3C) → IMPALA
 
 
 ### Key Elements
