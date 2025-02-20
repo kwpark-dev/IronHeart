@@ -1,4 +1,6 @@
+import torch
 import torch.nn as nn
+from torch.distributions import Normal
 
 
 
@@ -24,3 +26,47 @@ class Actor(nn.Module):
         action = self.head(feature) * self.scale
         
         return action 
+    
+    
+    
+class StochasticActor(nn.Module):
+    def __init__(self, state_dim, action_dim, scale):
+        super(StochasticActor, self).__init__()
+        
+        self.scale = scale
+        self.dist_net = nn.Sequential(nn.Linear(state_dim, 512),
+                                      nn.ReLU(),
+                                      nn.Linear(512, 256),
+                                      nn.ReLU(),
+                                      nn.Linear(256, 256),
+                                      nn.ReLU(),
+                                      nn.Linear(256, action_dim*2))
+        
+        
+    def forward(self, x):
+        mean, log_std = self.dist_net(x).chunk(2, dim=1)
+        
+        return mean, log_std
+        
+        
+    def sample(self, x):
+        mean, log_std = self.forward(x)
+        normal = Normal(mean, log_std.exp())
+        y = normal.rsample()
+        pi = torch.tanh(y)
+        # once the action is squashed by non-linear function, 
+        # the probability should be corrected by Jacobian det
+        # f(y) = f(x) |dx/dy| 
+        logp = (normal.log_prob(y) - torch.log(1 - pi**2 + 1e-8)).sum(dim=-1)
+               
+        return pi * self.scale, logp 
+    
+
+
+if __name__ == "__main__":
+    state = torch.randn(4, 3)
+    actor = StochasticActor(3, 9, 3)
+    pi, logp = actor.sample(state)
+    
+    print(pi)
+    print(logp)
