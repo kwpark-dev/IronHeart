@@ -1,14 +1,14 @@
 # IronHeart
 
-In this project, several representatives of modern RL approaches, especially deep learning-based, will be addressed. The learning capability is examined in "simple" Mujoco environments: InvertedPendulum-v5, Reacher-v5, and Hopper-v5. The objectives are as follows.
+In this project, several representatives of modern RL approaches, especially deep learning-based, will be addressed. The learning capability is examined in "simple" Mujoco environments sucha s InvertedPendulum-v5, Reacher-v5, or Hopper-v5. The objectives are as follows.
 
 1. Brief taxonomy & chronicle
 2. The strategies and the implications
-3. "NAIVE" implementation based on the paper from scratch
+3. (Semi-) "NAIVE" implementation based on the paper from scratch
 4. Experiements
-5. How to improve
+5. Discussion
 
-Here, **"NAIVE" implementation** means following the learning strategy presented in the paper **without trick**. Sometimes authors don't reveal their full approach, which can lead to "exaggerated" performance unintentionally. I believe, it also helps to understand fundamental problems beneath modern RL algorithms. Please note that x axis indicates epochs therefore the batch size should be multiplied to represent them as steps. The robust evaluation should be done statistically rather than one-shot measurement. The experiments were not repeated multiple times. Thus, please do not jump to the conclusion based on these results.  
+Here, **"NAIVE" implementation** means following the learning strategy presented in the paper **without trick**. Sometimes authors don't reveal their full approach, which can lead to "exaggerated" performance unintentionally. I believe, it also helps to understand fundamental problems beneath modern RL algorithms. The robust evaluation should be done statistically rather than one-shot measurement. The experiments were not repeated multiple times (due to computation time). Thus, please do not jump to the conclusion based on these results.  
 
 ## Deep Deterministic Policy Gradient (DDPG)
 
@@ -16,7 +16,7 @@ Here, **"NAIVE" implementation** means following the learning strategy presented
 
 | Type        | Training Policy | Execution Policy | Sampling | Remark |
 |-------------|-----------------|-------------|---------------|-------|
-| Off-policy  | Deterministic + Noise  | Deterministic |   .    | Target Network|
+| Off-policy  | Deterministic | Deterministic |   .    | Target Network|
 
 
 ### History
@@ -31,34 +31,31 @@ Deterministic Policy Gradient (DPG) → DDPG
 3. Target networks
 4. Polyak updates of the targets
 5. L2 regularization (in Adam optimizer)
+6. Replay buffer
+7. Step-wise learning
 
 The essence of DDPG is target networks which allows stable updates of the weights. It bootstraps Q-values via TD correction to train the current cirtic network. Due to off-policy nature, the stacked data in the replay buffer would cotain high variance, which leads to instability. The target networks take account of small portion of the current networks as updates so that it achieves stable improvements. In other words, the target networks correct TD-corrected values: it can mitigate the intrinsic variance coming from old policies.
 
 
 ### Experiments
-Followings are results of the experiments. Note that employed hyper-parameters including model architectures of each experiment are identical (you can find better hyper-parameters). Q values from the targets (cyan) are more stabilized than the one from the current networks. Bias is measured using Monte-Carlo (MC) return and is normalized. The value is clipped between -1 and 1. The agent in Reacher-v5 shows better behaviors. As the cumulative reward converges, mean, variance and minimum of Q values are also converging. Critic loss, however, seems to contain risk of instability because the gradient norm is rather high. Besides, bias is totally in chaos...
+I monitored 9 indicators as a performance measurement: cumulative reward, statistics of Q values, losses, gradient norm, and TD error. In the experiment, it was exetremely hard to reach out optimal convergence. In case the NAIVE version (the results are not from NAIVE implementation), the critics were easily collapsed. It might need to handle the hyperparameters very carefully so that the critic loss is lying on "moderate" range (of course, it would be env-dependent). Note that the critic networks are supervised by "pseudo labels", which are bootstrapped: therefore, the lowest loss definitely not guarantee the best reward. Min Q value also designates instability of critics, it drastically changes between the fool and the wise. Now, let's look at the cumulative reward. Steps between 15000 and 20000, the agent repeats poor and optimal performance. Statistics of TD error explains what it means: the variance of the error keeps very low level, which implies the estimated values are nearly same. The critic networks overfits to specific states & actions, so once it observes well-known states then it works very well.  
 
 <img src="images/ddpg/InvertedPendulum-v5_gam_099.jpg" alt="Performance Test" width="700"/>
 
-<img src="images/ddpg/Reacher-v5_gam_099.jpg" alt="Performance Test" width="700"/>
-
 <img src="images/ddpg/Hopper-v5_gam_099.jpg" alt="Performance Test" width="700"/>
 
-On the other hand, the rest of the environments deliver (tooooo) unstable behaviors. Critic loss of each env collapses in the middle of the training:it cannot estimate the values properly. This fact implies, the critic deceives the actor that belives make a best decision-making.
 
 ### Discussion
-DDPG needs well-tuned hyper-paarameters as well as a couple of training tricks such that 
+I added extra techniques to stabilize the critics such that
 
 1. Gradient clipping
-2. Prioritized replay buffer & fill the buffer before starting training
-3. Layer normalization (like batchnorm, layernorm, etc)
+2. Orthogonal initialization (only for critics)
+3. Layer normalization 
+4. L2 regularization in the critic loss
+5. Buffer warm-up
+6. Learning rate scheduler
 
-to stabilize the learning procedure. Along with learning instability, overestimation is another main defect of DDPG. Then, what are the lessons from DDPG approach? In my opinion, we should look at 
-
-1. Data distribution in the replay buffer
-2. Statistical meaning of "parsing trajectories"
-
-In case 2, critic samples data points with batch size and each of them belongs to different (or same) sequences that is generated from old policies. Target critic might not be safe enough to guard against the variance coming from policy discrepancy. Well, it needs more analytic investigation. 
+Still, it needs more tuning (like hyper-parameters & more training). In my opinion, it is not sufficient for the practical usages: the critics are too vulnerable. The crucial problem is coming from the credit assignment caused by learning instability. Thus, next improvement should be capable to enhance stability.
 
 
 ## Twin Delayed Deep Deterministic Policy Gradient (TD3)
@@ -67,7 +64,7 @@ In case 2, critic samples data points with batch size and each of them belongs t
 
 | Type        | Training Policy | Execution Policy | Sampling | Remark |
 |-------------|-----------------|-------------|---------------|-------|
-| Off-policy  | Deterministic + Noise | Deterministic | . | Twin Critics, Delayed Updates|
+| Off-policy  | Deterministic | Deterministic | . | Twin Critics, Delayed Updates|
 
 
 ### History
@@ -83,18 +80,28 @@ DPG → DDPG → TD3
 4. Polyak updates of the targets
 5. Policy smoothing
 6. Delayed updates of the targets and an actor
+7. Replay buffer
+8. Step-wise learning
 
-TD3 is an improved version of DDPG, it mainly deals with overestimation bias problem. Though the proof in TD3 assumes theoretical cricumstance, it clearly shows that even actor-critic in deteministic approach can gurantee overestimation. TD3 compares Q values from two different critics and choose a smaller one to mitigate the exaggeration. It definitely stabilize learning procedure but I still have a question mark if it "significantly" improve the optimization capability.
+TD3 is an improved version of DDPG, it mainly deals with overestimation bias problem. Though the proof in TD3 assumes theoretical cricumstance, it clearly shows that even actor-critic in deteministic approach can lead criticis to overestimation. TD3 compares Q values from two different critics and choose a smaller one to mitigate the exaggeration (vs game solver). It dramatically stabilize learning procedure but I still have doubts if it "significantly" improve the optimization capability.
 
 ### Experiments
-I agree that it can stabilize the learning process (if we set $\tau$ same as DDPG) because the instability of the critic networks is dramatically reduced. It still, however, struggles to find the optimum behaviors. 
+I agree that it can stabilize the learning process (if we set $\tau$ same as DDPG) because the instability of the critic networks is dramatically reduced. It still struggles to find the optimum behaviors. Mean Q values keep increasing over steps but its minimum oscillates as DDPG. The intended behavior seems to be reflected well into TD error because mean of errors smaller than the one of DDPG (remember overestimation). The variance wobbles drastically rather than keeping a certain level. It indicates that the model struggles to figure out the generalized value estimation but it seems not successful.
 
 <img src="images/td3/InvertedPendulum-v5_gam_099.jpg" alt="Performance Test" width="700"/>
 
-<img src="images/td3/Reacher-v5_gam_099.jpg" alt="Performance Test" width="700"/>
-
 <img src="images/td3/Hopper-v5_gam_099.jpg" alt="Performance Test" width="700"/>
 
+### Discussion
+As I did in DDPG approach, the implemented TD3 has additional features such that
+
+1. Gradient clipping
+2. Orthogonal initialization (only for critics)
+3. Layer normalization 
+4. Buffer warm-up
+5. Learning rate scheduler
+
+TD3 is more stable than DDPG but it is not free from the overfit problem, in my opinion. I guess, it is one of intrinsic problems in deterministic approach.  
 
 
 ## Soft Actor-Critic (SAC)

@@ -1,6 +1,9 @@
 import torch
+import torch.nn as nn
 import random
 from collections import deque
+from torch.optim.lr_scheduler import StepLR, CosineAnnealingLR
+
 
 
 
@@ -21,7 +24,13 @@ class AgentTD3:
         self._sync(self.critic, self.critic_target)
         
         self.critic_opt = optimizer(self.critic.parameters(), lr=self.critic_lr)
-    
+
+        if self.schedule:
+            self.scheduler = StepLR(self.critic_opt, 
+                                    step_size=self.decay_step, 
+                                    gamma=self.decay)
+        
+        
         self.actor_list = []
         self.actor_grad = []
         self.critic_list = []
@@ -45,19 +54,18 @@ class AgentTD3:
         self.noise = config['noise']
         self.max = config['max']
         self.min = config['min']
-        self.start = config['start']
         self.gamma = config['gamma']
         self.batch = config['batch']
         self.capacity = config['capacity']
         self.period = config['period']
         self.smooth = config['smooth']
         self.clip = config['smooth_clip']
+        self.schedule = config['schedule']
+        self.decay = config['decay']
+        self.decay_step = config['decay_step']
         
     
     def learn(self): # training mode
-        # print(len(self.storage))
-        if len(self.storage) < self.start: return
-        
         state, action, reward, done, next_state = self.storage.fetch(self.batch)
         
         with torch.no_grad():
@@ -66,17 +74,19 @@ class AgentTD3:
             q_one_target, q_two_target = self.critic_target(next_state, next_action + smooth)
             backup = reward + self.gamma * (1 - done) * torch.min(q_one_target, q_two_target)
         
-        q_one_est, q_two_est = self.critic(state, action)
+        q_one_est, q_two_est = self.critic(state, action.squeeze(1))
         critic_loss = ((backup - q_one_est)**2).mean() + ((backup - q_two_est)**2).mean()
         
         self.critic_opt.zero_grad()
         critic_loss.backward()
+        # critic gradient clipping
+        nn.utils.clip_grad_norm_(self.critic.parameters(), max_norm=0.5)
         # trace grad norm
         critic_grad = self._trace_grad(self.critic)
         self.critic_grad.append(critic_grad)
         self.critic_opt.step()
 
-        print(critic_loss.item())
+        # print(critic_loss.item())
 
         self.critic_list.append(critic_loss.item())
             
@@ -85,13 +95,14 @@ class AgentTD3:
             
             self.actor_opt.zero_grad()
             actor_loss.backward()
-            
+            # actor gradient clipping
+            nn.utils.clip_grad_norm_(self.actor.parameters(), max_norm=1.0)
             # trace grad norm
             actor_grad = self._trace_grad(self.actor)
             self.actor_grad.append(actor_grad)
             self.actor_opt.step()
 
-            print(actor_loss.item(), critic_loss.item())
+            # print(actor_loss.item(), critic_loss.item())
 
             self.actor_list.append(actor_loss.item())
             # self.critic_list.append(critic_loss.item())
@@ -117,7 +128,7 @@ class AgentTD3:
         
             
     def action(self, state, mode='train'):
-        # self.actor.eval() # anyhow sample actions after turning off util layers
+        self.actor.eval() # anyhow sample actions after turning off util layers
         with torch.no_grad():
             action = self.actor(state)
         
@@ -131,6 +142,9 @@ class AgentTD3:
         
         
     def get_q_value(self, state, action):
+        self.critic.eval()
+        self.critic_target.eval()
+        
         with torch.no_grad():
             q_one_est, q_two_est = self.critic(state, action)
             q_one_target, q_two_target = self.critic_target(state, action)

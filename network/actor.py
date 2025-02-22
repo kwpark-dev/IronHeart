@@ -4,22 +4,34 @@ from torch.distributions import Normal
 
 
 
+def orthogonal_init(module):
+    if isinstance(module, nn.Linear) or isinstance(module, nn.Conv2d):
+        nn.init.orthogonal_(module.weight)
+        if module.bias is not None:
+            torch.nn.init.zeros_(module.bias)
+
+
 class Actor(nn.Module):
     def __init__(self, state_dim, action_dim, scale):
         super(Actor, self).__init__()
         
         self.scale = scale
         self.backbone = nn.Sequential(nn.Linear(state_dim, 512),
+                                      nn.LayerNorm(512),
                                       nn.ReLU(),
                                       nn.Linear(512, 256),
+                                      nn.LayerNorm(256),
                                       nn.ReLU(),
                                       nn.Linear(256, 256),
+                                      nn.LayerNorm(256),
                                       nn.ReLU())
         
         # note that a range of actions is -1 ~ 1
         self.head = nn.Sequential(nn.Linear(256, action_dim),
                                   nn.Tanh())
         
+        # self.apply(orthogonal_init)
+    
     
     def forward(self, x):
         feature = self.backbone(x)
@@ -65,8 +77,7 @@ class StochasticActor(nn.Module):
 
 if __name__ == "__main__":
     state = torch.randn(4, 3)
-    actor = StochasticActor(3, 9, 3)
-    pi, logp = actor.sample(state)
+    actor = Actor(3, 9, 3)
+    action = actor(state)
     
-    print(pi)
-    print(logp)
+    print(action)
