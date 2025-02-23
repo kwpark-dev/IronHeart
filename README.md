@@ -5,10 +5,10 @@ In this project, several representatives of modern RL approaches, especially dee
 1. Brief taxonomy & chronicle
 2. The strategies and the implications
 3. (Semi-) "NAIVE" implementation based on the paper from scratch
-4. Experiements
+4. Experiements: 20k ~ 40k learning
 5. Discussion
 
-Here, **"NAIVE" implementation** means following the learning strategy presented in the paper **without trick**. Sometimes authors don't reveal their full approach, which can lead to "exaggerated" performance unintentionally. I believe, it also helps to understand fundamental problems beneath modern RL algorithms. The robust evaluation should be done statistically rather than one-shot measurement. The experiments were not repeated multiple times (due to computation time). Thus, please do not jump to the conclusion based on these results.  
+Here, **"NAIVE" implementation** means following the learning strategy presented in the paper **without trick**. Sometimes authors don't reveal their full approach, which can lead to "exaggerated" performance unintentionally. I believe, it also helps to understand fundamental problems beneath modern RL algorithms. The robust evaluation should be done statistically rather than one-shot measurement. The experiments were not repeated multiple times (due to computation time). Besides, the training is done by 40k steps at last, which is not sufficient exploration for the continuous environment. Thus, please do not jump to the conclusion based on these results.  
 
 ## Deep Deterministic Policy Gradient (DDPG)
 
@@ -27,7 +27,7 @@ Deterministic Policy Gradient (DPG) → DDPG
 ### Key Elements
 
 1. Artificial noise to actions for exploration steps
-2. Temporal difference (TD) correction through bootstrapping
+2. Temporal difference (TD) correction of bootstrapped Q value
 3. Target networks
 4. Polyak updates of the targets
 5. L2 regularization (in Adam optimizer)
@@ -38,7 +38,7 @@ The essence of DDPG is target networks which allows stable updates of the weight
 
 
 ### Experiments
-I monitored 9 indicators as a performance measurement: cumulative reward, statistics of Q values, losses, gradient norm, and TD error. In the experiment, it was exetremely hard to reach out optimal convergence. In case the NAIVE version (the results are not from NAIVE implementation), the critics were easily collapsed. It might need to handle the hyperparameters very carefully so that the critic loss is lying on "moderate" range (of course, it would be env-dependent). Note that the critic networks are supervised by "pseudo labels", which are bootstrapped: therefore, the lowest loss definitely not guarantee the best reward. Min Q value also designates instability of critics, it drastically changes between the fool and the wise. Now, let's look at the cumulative reward. Steps between 15000 and 20000, the agent repeats poor and optimal performance. Statistics of TD error explains what it means: the variance of the error keeps very low level, which implies the estimated values are nearly same. The critic networks overfits to specific states & actions, so once it observes well-known states then it works very well.  
+I monitored 9 indicators as a performance measurement: cumulative reward, statistics of Q values, losses, gradient norm, and TD error. It might need to handle the hyperparameters very carefully so that the critic loss is lying on "moderate" range (of course, it would be env-dependent). Note that the critic networks are supervised by "pseudo labels", which are bootstrapped: therefore, the lowest loss definitely not guarantee the best reward. Min Q value also designates instability of critics, it drastically changes between the fool and the wise. But, again, 20k is not enough for full training! 
 
 <img src="images/ddpg/InvertedPendulum-v5_gam_099.jpg" alt="Performance Test" width="700"/>
 
@@ -55,7 +55,7 @@ I added extra techniques to stabilize the critics such that
 5. Buffer warm-up
 6. Learning rate scheduler
 
-Still, it needs more tuning (like hyper-parameters & more training). In my opinion, it is not sufficient for the practical usages: the critics are too vulnerable. The crucial problem is coming from the credit assignment caused by learning instability. Thus, next improvement should be capable to enhance stability.
+Still, it needs more tuning (like hyper-parameters & more training). Researchers (who have trained the agent for 1M steps) point out that it is not sufficient for the practical usages: the critics are too vulnerable. The crucial problem is coming from the credit assignment caused by learning instability. Thus, next improvement should be capable to enhance stability.
 
 
 ## Twin Delayed Deep Deterministic Policy Gradient (TD3)
@@ -75,7 +75,7 @@ DPG → DDPG → TD3
 ### Key Elements
 
 1. Artificial noise to actions for exploration steps
-2. TD correction through bootstrapping
+2. TD correction of bootstrapped Q value
 3. Twin critics (of course twin target critics as well)
 4. Polyak updates of the targets
 5. Policy smoothing
@@ -83,10 +83,10 @@ DPG → DDPG → TD3
 7. Replay buffer
 8. Step-wise learning
 
-TD3 is an improved version of DDPG, it mainly deals with overestimation bias problem. Though the proof in TD3 assumes theoretical cricumstance, it clearly shows that even actor-critic in deteministic approach can lead criticis to overestimation. TD3 compares Q values from two different critics and choose a smaller one to mitigate the exaggeration (vs game solver). It dramatically stabilize learning procedure but I still have doubts if it "significantly" improve the optimization capability.
+TD3 is an improved version of DDPG, it mainly deals with overestimation bias problem. Though the proof in TD3 assumes theoretical cricumstance, it clearly shows that even actor-critic in deteministic approach can lead criticis to overestimation. TD3 compares Q values from two different critics and choose a smaller one to mitigate the exaggeration (vs game solver).
 
 ### Experiments
-I agree that it can stabilize the learning process (if we set $\tau$ same as DDPG) because the instability of the critic networks is dramatically reduced. It still struggles to find the optimum behaviors. Mean Q values keep increasing over steps but its minimum oscillates as DDPG. The intended behavior seems to be reflected well into TD error because mean of errors smaller than the one of DDPG (remember overestimation). The variance wobbles drastically rather than keeping a certain level. It indicates that the model struggles to figure out the generalized value estimation but it seems not successful.
+The intended behavior seems to be reflected well into TD error because mean of errors more deviated than the one of DDPG (remember overestimation or it might be early to conclude it). 
 
 <img src="images/td3/InvertedPendulum-v5_gam_099.jpg" alt="Performance Test" width="700"/>
 
@@ -101,26 +101,49 @@ As I did in DDPG approach, the implemented TD3 has additional features such that
 4. Buffer warm-up
 5. Learning rate scheduler
 
-TD3 is more stable than DDPG but it is not free from the overfit problem, in my opinion. I guess, it is one of intrinsic problems in deterministic approach.  
+TD3 is more stable than DDPG (if $\tau$ is same) but it is not free from the overfit problem, in my opinion. I guess, it is one of intrinsic problems in deterministic approach.  
 
 
 ## Soft Actor-Critic (SAC)
 
-DPG → DDPG → TD3 → SAC
-
-
 ### Taxonomy
+| Type        | Training Policy | Execution Policy | Sampling | Remark |
+|-------------|-----------------|-------------|---------------|-------|
+| Off-policy  | Stochastic | Deterministic | Explicit | Entropy |
 
 
 ### History
+DPG → DDPG → TD3 → SAC
 
 
 ### Key Elements
+1. Tractable policy distribution: Gaussian 
+2. Soft value function
+3. TD correction of bootstrapped soft value
+4. NO actor target
+5. Twin critics (of course twin target critics as well)
+6. Temperature that handles exploration (either learnable or constant)
+7. Replay buffer
+8. Step-wise learning
 
 
 
 ### Experiments
+It was fortunate the SAC agent reaches out optimal convergence in the InvertedPendulum-v5 env within 40k steps. I think overfitting is dramatically mitigated but it might need careful adjustment of the temperature: this factor is highly dependent on the env, so it would be necessary to set it as a learnable parameter in practice.
 
+<img src="images/sac/InvertedPendulum-v5_gam_099.jpg" alt="Performance Test" width="700"/>
+
+<img src="images/sac/Hopper-v5_gam_099.jpg" alt="Performance Test" width="700"/>
+
+### Discussion
+As I did in DDPG approach, the implemented SAC has additional features such that
+
+1. Gradient clipping
+2. Orthogonal initialization (only for critics)
+3. Layer normalization 
+4. Buffer warm-up
+
+SAC is even better than DDPG and TD3. Apart from the results, the evolution of critic is not intuitive. What does it mean? What is the job of the critics to maximize the cumulative reward?
 
 
 ## Proximal Policy Optimization (PPO)

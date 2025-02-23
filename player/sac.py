@@ -1,4 +1,5 @@
 import torch
+import torch.nn as nn
 import random
 from collections import deque
 
@@ -48,7 +49,6 @@ class AgentSAC:
         self.noise = config['noise']
         self.max = config['max']
         self.min = config['min']
-        self.start = config['start']
         self.gamma = config['gamma']
         self.batch = config['batch']
         self.capacity = config['capacity']
@@ -56,11 +56,8 @@ class AgentSAC:
         
     
     def learn(self): # training mode
-        # print(len(self.storage))
-        if len(self.storage) < self.start: return
-        
         state, action, reward, done, next_state = self.storage.fetch(self.batch)
-        action = action.squeeze()
+        # action = action.squeeze()
         
         with torch.no_grad():
             next_action, next_log_prob = self.actor.sample(next_state)
@@ -68,11 +65,13 @@ class AgentSAC:
             q_target = torch.min(q_one_target, q_two_target) - self.temp * next_log_prob
             backup = reward + self.gamma * (1 - done) * q_target
         
-        q_one_est, q_two_est = self.critic(state, action)
+        q_one_est, q_two_est = self.critic(state, action.squeeze(1))
         critic_loss = ((backup - q_one_est)**2).mean() + ((backup - q_two_est)**2).mean()
         
         self.critic_opt.zero_grad()
         critic_loss.backward()
+        # critic gradient clipping
+        nn.utils.clip_grad_norm_(self.critic.parameters(), max_norm=0.5)
         # trace grad norm
         critic_grad = self._trace_grad(self.critic)
         self.critic_grad.append(critic_grad)
@@ -87,7 +86,8 @@ class AgentSAC:
         
         self.actor_opt.zero_grad()
         actor_loss.backward()
-        
+        # actor gradient clipping
+        nn.utils.clip_grad_norm_(self.actor.parameters(), max_norm=1.0)
         # trace grad norm
         actor_grad = self._trace_grad(self.actor)
         self.actor_grad.append(actor_grad)
@@ -115,15 +115,26 @@ class AgentSAC:
         return grad_norm ** 0.5        
         
             
-    def action(self, state):
-        # self.actor.eval() # anyhow sample actions after turning off util layers
-        with torch.no_grad():
-            action, logp = self.actor.sample(state)
+    def action(self, state, mode='train'):
+        self.actor.eval() # anyhow sample actions after turning off util layers
         
-        return action, logp
+        if mode == 'train':
+            with torch.no_grad():
+                action, logp = self.actor.sample(state)
+            
+            return action, logp
+        
+        else:
+            with torch.no_grad():
+                action = self.actor.sample(state, mode)
+                
+            return action
         
         
     def get_q_value(self, state, action):
+        self.critic.eval()
+        self.critic_target.eval()
+        
         with torch.no_grad():
             q_one_est, q_two_est = self.critic(state, action)
             q_one_target, q_two_target = self.critic_target(state, action)

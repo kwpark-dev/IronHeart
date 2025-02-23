@@ -91,6 +91,7 @@ class AgentDDPG:
         
         self.actor_opt.zero_grad()
         actor_loss.backward()
+        # actor gradient clipping
         nn.utils.clip_grad_norm_(self.actor.parameters(), max_norm=1.0)
         # trace grad norm
         actor_grad = self._trace_grad(self.actor)

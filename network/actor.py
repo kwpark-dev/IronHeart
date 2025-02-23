@@ -47,12 +47,13 @@ class StochasticActor(nn.Module):
         
         self.scale = scale
         self.dist_net = nn.Sequential(nn.Linear(state_dim, 512),
+                                      nn.LayerNorm(512),
                                       nn.ReLU(),
                                       nn.Linear(512, 256),
+                                      nn.LayerNorm(256),
                                       nn.ReLU(),
-                                      nn.Linear(256, 256),
-                                      nn.ReLU(),
-                                      nn.Linear(256, action_dim*2))
+                                      nn.Linear(256, action_dim*2),
+                                      nn.Tanh())
         
         
     def forward(self, x):
@@ -61,17 +62,23 @@ class StochasticActor(nn.Module):
         return mean, log_std
         
         
-    def sample(self, x):
+    def sample(self, x, mode='train'):
         mean, log_std = self.forward(x)
-        normal = Normal(mean, log_std.exp())
-        y = normal.rsample()
-        pi = torch.tanh(y)
-        # once the action is squashed by non-linear function, 
-        # the probability should be corrected by Jacobian det
-        # f(y) = f(x) |dx/dy| 
-        logp = (normal.log_prob(y) - torch.log(1 - pi**2 + 1e-8)).sum(dim=-1)
-               
-        return pi * self.scale, logp 
+        
+        if mode == 'train':
+            normal = Normal(mean, log_std.exp())
+            y = normal.rsample()
+            pi = torch.tanh(y)
+            # once the action is squashed by non-linear function, 
+            # the probability should be corrected by Jacobian det
+            # f(y) = f(x) |dx/dy| 
+            logp = (normal.log_prob(y) - torch.log(1 - pi**2 + 1e-8)).sum(dim=-1)
+                
+            return pi * self.scale, logp
+        
+        else: 
+            return torch.tanh(mean) * self.scale
+             
     
 
 

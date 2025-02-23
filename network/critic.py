@@ -21,9 +21,6 @@ class Critic(nn.Module):
                                  nn.Linear(512, 256),
                                  nn.LayerNorm(256),
                                  nn.ReLU(),
-                                 nn.Linear(256, 256),
-                                 nn.LayerNorm(256),
-                                 nn.ReLU(),
                                  nn.Linear(256, 1))
     
         self.apply(orthogonal_init)
@@ -47,18 +44,12 @@ class TwinCritic(nn.Module):
                                    nn.Linear(512, 256),
                                    nn.LayerNorm(256),
                                    nn.ReLU(),
-                                   nn.Linear(256, 256),
-                                   nn.LayerNorm(256),
-                                   nn.ReLU(),
                                    nn.Linear(256, 1))
         
         self.q_two = nn.Sequential(nn.Linear(state_dim + action_dim, 512),
                                    nn.LayerNorm(512),
                                    nn.ReLU(),
                                    nn.Linear(512, 256),
-                                   nn.LayerNorm(256),
-                                   nn.ReLU(),
-                                   nn.Linear(256, 256),
                                    nn.LayerNorm(256),
                                    nn.ReLU(),
                                    nn.Linear(256, 1))
