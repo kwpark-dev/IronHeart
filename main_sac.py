@@ -41,8 +41,8 @@ if __name__ == "__main__":
               'min': min_action[0],
               'gamma':0.99,
               'batch':128,
-              'capacity':100000,
-              'temp':0.2}
+              'capacity':200000,
+              'temp':0.1}
     
     agent = AgentSAC(StochasticActor, TwinCritic, Adam, ReplayBuffer, config)
     reward_list = []
@@ -57,7 +57,7 @@ if __name__ == "__main__":
     
     period = 1
     step = 0
-    warmup = 60000
+    warmup = 100000
     learning_step = warmup + 40000
     
     assert learning_step > warmup, "learning step should be bigger than warm-up buffer size"
