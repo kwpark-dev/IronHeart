@@ -147,45 +147,26 @@ SAC is even better than DDPG and TD3. Apart from the results, the evolution of c
 
 
 ## Proximal Policy Optimization (PPO)
+Please refer to cool report [here](https://github.com/kwpark-dev/RL_toolkits/tree/main)
+
 
 ### Taxonomy
+| Type        | Training Policy | Execution Policy | Sampling | Remark |
+|-------------|-----------------|-------------|---------------|-------|
+| On-policy  | Stochastic | Deterministic | Explicit | Surrogate Objective |
 
 
 ### History
 
 Conservative Policy Ieteration (CPI) → Trusted Region Policy Optimization (TRPO) → PPO
 
-
-### Key Elements
-
-
-
-### Experiments
-
-
-
-## Asynchronous Advantage Actor-Critic (A3C)
-
-
-### Taxonomy
-
-
-### History
-
-Advantage Actor-Critic (A2C) → A3C
-
-
-### Key Elements
-
-
-
-### Experiments
-
-
 ## Importance-Weighted Actor-Learner Architecture (IMPALA)
 
 
 ### Taxonomy
+| Type        | Training Policy | Execution Policy | Sampling | Remark |
+|-------------|-----------------|-------------|---------------|-------|
+| Off-policy  | Stochastic | Deterministic | Implicit | V-trace, Learner Queue |
 
 
 ### History

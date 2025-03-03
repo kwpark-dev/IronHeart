@@ -66,6 +66,9 @@ class AgentTD3:
         
     
     def learn(self): # training mode
+        self.actor.train()
+        self.critic.train()
+        
         state, action, reward, done, next_state = self.storage.fetch(self.batch)
         
         with torch.no_grad():

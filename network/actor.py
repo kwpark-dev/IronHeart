@@ -81,6 +81,41 @@ class StochasticActor(nn.Module):
              
     
 
+class ActorCritic(nn.Module):
+    def __init__(self, state_dim, action_dim, scale):
+        super(ActorCritic, self).__init__()
+        
+        self.scale = scale
+        self.backbone = nn.Sequential(nn.Linear(state_dim, 512),
+                                      nn.LayerNorm(512),
+                                      nn.ReLU(),
+                                      nn.Linear(512, 256),
+                                      nn.LayerNorm(256),
+                                      nn.ReLU(),
+                                      nn.Linear(256, 256),
+                                      nn.LayerNorm(256),
+                                      nn.ReLU())
+        
+        # note that a range of actions is -1 ~ 1
+        self.actor_head = nn.Sequential(nn.Linear(256, action_dim),
+                                        nn.Tanh())
+       
+        self.critic_head = nn.Linear(256, 1)
+        self.prob_head = nn.Linear(action_dim, action_dim)
+               
+        self.apply(orthogonal_init)
+    
+    
+    def forward(self, x):
+        feature = self.backbone(x)
+        action = self.actor_head(feature)
+        log_p = self.prob_head(action).sum()
+        value = self.critic_head(feature)
+        
+        return action*self.scale, log_p, value
+
+
+
 
 if __name__ == "__main__":
     state = torch.randn(4, 3)

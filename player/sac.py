@@ -56,8 +56,10 @@ class AgentSAC:
         
     
     def learn(self): # training mode
+        self.actor.train()
+        self.critic.train()
+        
         state, action, reward, done, next_state = self.storage.fetch(self.batch)
-        # action = action.squeeze()
         
         with torch.no_grad():
             next_action, next_log_prob = self.actor.sample(next_state)
