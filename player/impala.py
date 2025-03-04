@@ -52,13 +52,12 @@ def explorer(env, idx, trendy, pipe, stop_event, rollout_size): # actor
         rollout = []
         for _ in range(rollout_size):
             
-            # trendy.eval()
+            trendy.eval()
             with torch.no_grad():
-                action, _b_prob, _ = trendy(state)
+                action, b_logit, _ = trendy(state)
             
-            b_prob = _b_prob[action]
-            
-            next_state, reward, done, trun, _ = env.step(action.item())
+            b_prob = torch.sigmoid(b_logit.sum(dim=0))
+            next_state, reward, done, trun, _ = env.step(action.numpy())
             next_state = torch.tensor(next_state, dtype=torch.float32)
             reward = torch.tensor([reward], dtype=torch.float32)
             done = torch.tensor([done], dtype=torch.float32)
@@ -81,9 +80,12 @@ def explorer(env, idx, trendy, pipe, stop_event, rollout_size): # actor
     
             
     
-def learner(trendy, optimizer, pipe, batch_size, rollout_size, epoch, stop_event): # learner
+def learner(trendy, optimizer, pipe, batch_size, epoch, stop_event): # learner
     data_table = []
     measured = 0
+    
+    trendy.train()
+    
     for j in range(epoch):
         mini_batch = []
         
@@ -100,10 +102,10 @@ def learner(trendy, optimizer, pipe, batch_size, rollout_size, epoch, stop_event
         b_prob = torch.stack(b_prob)
         done = torch.stack(done)
         
-        _, _t_prob, t_value = trendy(state)
-        
-        t_prob = torch.gather(_t_prob, 1, action.unsqueeze(1))
-        t_prob = t_prob.squeeze(1)
+        _, t_logit, t_value = trendy(state)
+        t_prob = torch.sigmoid(t_logit.sum(dim=1))
+        # t_prob = torch.gather(_t_prob, 1, action.unsqueeze(1))
+        # t_prob = t_prob.squeeze(1)
         
         v_s, imp_ratio, q_s = v_trace(b_prob, t_prob, reward, t_value, done)
         bias = v_s - t_value
@@ -113,7 +115,7 @@ def learner(trendy, optimizer, pipe, batch_size, rollout_size, epoch, stop_event
         log_probs = torch.log(t_prob.squeeze() + 1e-4)
         actor_loss = - (imp_ratio * (log_probs * base)).mean()
         
-        entropy = (0.05 * _t_prob * _t_prob.log()).sum(dim=1).mean()
+        entropy = (0.05 * t_prob * t_prob.log()).mean()
         
         loss = actor_loss + critic_loss + entropy
         print(loss.item(), actor_loss.item(), critic_loss.item(), entropy.item())
@@ -122,18 +124,20 @@ def learner(trendy, optimizer, pipe, batch_size, rollout_size, epoch, stop_event
         loss.backward()
         optimizer.step()
         
-        torch.save(trendy.state_dict(), './model/model_epoch_{}.pth'.format(j))
+        # torch.save(trendy.state_dict(), './model/model_epoch_{}.pth'.format(j))
         
-        ratio_mean = imp_ratio.mean().item()
-        ratio_max = imp_ratio.max().item()
-        ratio_min = imp_ratio.min().item()
+        # ratio_mean = imp_ratio.mean().item()
+        # ratio_max = imp_ratio.max().item()
+        # ratio_min = imp_ratio.min().item()
         
-        data_table.append([measured,
-                           ratio_mean,
-                           ratio_max,
-                           ratio_min,
-                           loss.item(),
-                           actor_loss.item(),
-                           critic_loss.item(),
-                           entropy.item(),
-                           base.var().item()])
+        # data_table.append([measured,
+        #                    ratio_mean,
+        #                    ratio_max,
+        #                    ratio_min,
+        #                    loss.item(),
+        #                    actor_loss.item(),
+        #                    critic_loss.item(),
+        #                    entropy.item(),
+        #                    base.var().item()])
+        
+    stop_event.set()

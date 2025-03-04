@@ -11,21 +11,32 @@ import gymnasium as gym
 if __name__ == "__main__":
     mp.set_start_method("spawn")
     
-    in_dim = 4
-    out_dim = 2
-    lr = 4e-5
-    batch_size = 256
-    rollout_size = 128
+    lr = 1e-3
+    batch_size = 128
+    rollout_size = 64
     epoch = 256
     
-    trendy = ActorCritic(in_dim, out_dim)
+    # name = "InvertedPendulum-v5"
+    # name = "Reacher-v5"
+    name = "Hopper-v5"
+    
+    max_step = 1000
+    if name == "Reacher-v5":
+        max_step = 200
+    
+    env = gym.make(name, max_episode_steps=max_step)
+    in_dim = env.observation_space.shape[0]
+    out_dim = env.action_space.shape[0]
+    max_action = env.action_space.high[0]
+    # min_action = env.action_space.low
+            
+    trendy = ActorCritic(in_dim, out_dim, max_action)
     trendy.share_memory()
     
     optimizer = optim.Adam(trendy.parameters(), lr=lr)
     pipe = mp.Queue()
     stop_event = mp.Event()
     num = 4
-    env = gym.make("Hopper-v5")
     
     process = []
     for idx in range(num):
@@ -33,7 +44,7 @@ if __name__ == "__main__":
         p.start()
         process.append(p)
         
-    lp = mp.Process(target=learner, args=(trendy, optimizer, pipe, batch_size, rollout_size,
+    lp = mp.Process(target=learner, args=(trendy, optimizer, pipe, batch_size,
                                           epoch, stop_event))
     lp.start()
     
@@ -43,8 +54,8 @@ if __name__ == "__main__":
         p.join()
     
     pipe.close()
+    
     print("Queue is removed.")
-        
     print("All done")
         
         

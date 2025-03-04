@@ -108,11 +108,12 @@ class ActorCritic(nn.Module):
     
     def forward(self, x):
         feature = self.backbone(x)
+        
         action = self.actor_head(feature)
-        log_p = self.prob_head(action).sum()
+        logit = self.prob_head(action)
         value = self.critic_head(feature)
         
-        return action*self.scale, log_p, value
+        return action*self.scale, logit, value
 
 
 
