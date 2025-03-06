@@ -1,7 +1,10 @@
 import torch
 import torch.nn as nn
+import numpy as np
 import random
+import matplotlib.pyplot as plt
 from collections import deque
+
 
 
 
@@ -126,18 +129,34 @@ def learner(trendy, optimizer, pipe, batch_size, epoch, stop_event): # learner
         
         # torch.save(trendy.state_dict(), './model/model_epoch_{}.pth'.format(j))
         
-        # ratio_mean = imp_ratio.mean().item()
+        ratio_mean = imp_ratio.mean().item()
         # ratio_max = imp_ratio.max().item()
         # ratio_min = imp_ratio.min().item()
         
-        # data_table.append([measured,
-        #                    ratio_mean,
-        #                    ratio_max,
-        #                    ratio_min,
-        #                    loss.item(),
-        #                    actor_loss.item(),
-        #                    critic_loss.item(),
-        #                    entropy.item(),
-        #                    base.var().item()])
-        
+        data_table.append([ratio_mean,
+                           actor_loss.item(),
+                           critic_loss.item(),
+                           entropy.item()])
+    
+    rlist, alist, clist, elist = np.array(data_table).T
+    
+    fig, ax = plt.subplots(2, 2, figsize=(9, 9))
+    
+    ax[0][0].plot(rlist, color='black')
+    ax[0][0].set_title('Mean Importance Sampling')
+    
+    ax[0][1].plot(alist, color='orange')
+    ax[0][1].set_title('Actor Loss')
+    
+    ax[1][0].plot(clist, color='blue')
+    ax[1][0].set_title('Critic Loss')
+    
+    ax[1][1].plot(elist, color='red')
+    ax[1][1].set_title('Entropy')
+    
+    plt.savefig('./images/impala/test.jpg')
+    # plt.show()
+    
+    
+    
     stop_event.set()

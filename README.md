@@ -175,7 +175,24 @@ A2C → A3C → GPU A3C (GA3C) → IMPALA
 
 
 ### Key Elements
+1. Implicit action sampling
+2. V-trace
+3. Batch-wise learning
+4. Rollout Buffer
+5. Communication with multiple actors
 
+The aim of IMPALA is scalability, it wants to extend the solution to the more complex problem. The essence is V-trace and multi-process. Each process contain different actor updated by lag policy. Because multiple actors explore the environment, the sample efficiency is remarkable. On the other hand, the samples are collected by different policy, therefore training data would have high variance. V-trace is a mean to avoid such a problem. It adjusts TD-corrected values adding discrepancy reduction term.   
 
 
 ### Experiments
+The code still has room to be optimized and to fix. It looks very promising for the multi-agent system. Note that the simulation runs only 256 steps as a test.
+
+<img src="images/impala/test.jpg" alt="Performance Test" width="700"/>
+
+### Discussion
+It has additional features such that
+
+1. Orthogonal initialization (only for critics)
+2. Layer normalization 
+
+I believe that IMPALA can allow robust behavior learning through the efficient sampling strategy. For example, if the data is available, server can collect driving data from drivers to train a learner (or learners). Of course, policies of the drivers and the learner is no more coupled each other, it might be more challenging to handle the variance. 
